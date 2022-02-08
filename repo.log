@@ -1,0 +1,6 @@
+2022-Feb-08
+
+set up repo and add currentpr.prims to be duplicated with
+different task scripts, the currentpr can now rescale to 
+long sequences to model, for instance, Saffran's task that
+requires continuous presentation of syllables without pauses
