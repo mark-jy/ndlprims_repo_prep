@@ -1,0 +1,1612 @@
+define task pr_g_tr_xay_24 {
+    initial-goals: (init)
+    lf: 0.002
+    // imaginal-delay as default
+    perception-action-latency: 0.05
+    production-prim-latency: 0.0 // lower-level timing no considered
+    // procedural-reward, egs, alpha, nu, primU as defaults
+    dat: 0.05 // we do consider operator-level timing and compilation
+    opc: t
+    default-activation: 0 // activation-lowerbound is 0.0
+    rt: -2 // slightly higher
+    // bll, lf, ol, mas, ans as default, mp wont needed because pm is off, base-level term has a network-sense than frequentist
+    default-operator-assoc: 0.0
+    default-inter-operator-assoc: 0 // skill/operator-operator assocs now learn through context (e.g., "goal%last-operator%name") with maximum association of 1.0
+    default-operator-self-assoc: 0.0 // default self-assoc is retained to prevent repetition
+    mas: 0.0 // similarly for context-declarative assocs
+    context-learning: t // context-operator + context-declarative learning all in one
+    beta: 0.001 // learning rate
+    // reward: 1
+    negreward: t // turn on positive and negative learning, magnitude not relevant
+    sp2bl: 1
+    ga: 2
+    input-activation-op: 5
+    input-activation-ch: 5
+    retrieval-activation-op: 0 // already taken care in "ga:"
+    retrieval-activation-ch: 5
+    wm-activation-op: 5
+    wm-activation-ch: 5
+    ans: 0.05
+    explore-exploit: 0.1
+    //local-or-global: t // comment out means global
+    single-or-multiple: t // multiple
+
+    // We define the objective and subjective sequential positions in procedural outcome definitions. The objective position is defined as the actual position of the pattern (e.g., XYZ, there are the corresponding positions from 1-3). The collection of objective positions should not matter as to how the model subjectively perceived the pattern but was nevertheless included to provide a more clear understanding of what the model is doing.
+    
+    outcome-ops: (// procedural outcomes:input-audicon match ///////////////////////////
+                  
+                  pos2v2=wm1%input=audicon1_pos1_enc
+                  
+                  pos3v2=wm1%input=audicon1_pos2_enc
+                  pos3v2=wm2%input=audicon2_pos2_enc
+                  
+                  // procedural outcomes:input-memory match /////////////////////////////
+                  
+                  // pos1v2=rt1%input1=memory1_pos1_enc // not instantiated since model retrieves based on input1
+                  pos1v2=rt2%input1=memory2_pos1_enc
+                  pos1v2=rt3%input1=memory3_pos1_enc
+                  
+                  pos2v2=rt1%input2=memory1_pos2_enc
+                  pos2v2=rt2%input2=memory2_pos2_enc
+                  pos2v2=rt3%input2=memory3_pos2_enc
+                  
+                  pos3v2=rt1%input3=memory1_pos3_enc
+                  pos3v2=rt2%input3=memory2_pos3_enc
+                  pos3v2=rt3%input3=memory3_pos3_enc
+                  
+                  // procedural outcomes:audicon-memory mismatch /////////////////////////
+                  
+                  pos1wm1<>rt1%audicon1<>memory1_pos1_enc
+                  pos1wm2<>rt2%audicon2<>memory2_pos1_enc
+                  pos1wm3<>rt3%audicon3<>memory3_pos1_enc
+
+                  pos2wm1<>rt1%audicon1<>memory1_pos2_enc
+                  pos2wm2<>rt2%audicon2<>memory2_pos2_enc
+                  pos2wm3<>rt3%audicon3<>memory3_pos2_enc
+
+                  pos3wm1<>rt1%audicon1<>memory1_pos3_enc
+                  pos3wm2<>rt2%audicon2<>memory2_pos3_enc
+                  pos3wm3<>rt3%audicon3<>memory3_pos3_enc
+                  )
+                  
+                  // The subjective position is defined as the position that the model has encoded to (e.g., If the model encodes from the 2nd-3rd object positions, then the subjective position is 2 instead of 3).
+                  
+    position-ops: (
+                   i_pos1-wm1%1
+                   i_pos2-wm2%2
+                   i_pos3-wm3%3
+                   i_pos4-wm4%4
+                   )
+    }
+
+
+
+
+define skill all {
+
+
+///////////////////////////////
+//  INPUT RETRIVAL REQUESTS   //
+/////////////////////////////////
+
+// Retrieval from storage now starts when the current input hasn't been coded into the audicon. This is done before immediate audicon encoding, to guard against immediate input-audicon and input-memory comparisons. In other words, if the input has already been encoded into the audicon that leads to an immediate retrieval, then it is trivially apparent that the immediate input content would be the same as the immediately encoded audicon content and the retrieved memory content. Similarly, for very the first position, the input and retrieved memory contents are not compared. However, the audicon and memory comparisons are always issued after the encoding. There, finding a match (other than finding a mismatch) does not lead to a precedural outcome.
+
+// For the first input, a retrieval request is issued by placing this first input content (notice that the content of the input is represented in V2, while V1 stores the positional information) into the first slot of the retrieval request (RT1). Based on this request, the most highly activated (above threshold) chunk that starts with this input (RT1=V2) should be retrieved from storage to the memory buffer. The first input content is also used in retrieval requests during the presentation of subsequent inputs. Since the first input is cleared from the buffer after it is presented, we store this very first input content into the goal buffer of G5.
+
+// G4 collects the position information before audicon encoding (for input-audicon and input-memory comparisons).
+
+  operator i_pos1-rt {
+    V1 <> nil   // current input position
+    V2 <> nil   // current input content
+    WM1 = nil   // relevant WM slot to be encoded
+    V8 <> nil
+    ==>
+    nil -> V8   // prevent reselection after selection (refractory)
+    V2 -> RT1   // retrieval request
+    V2 -> G5    // store very first input content
+    one -> G3
+  }
+  
+  // For subsequent inputs. The retrieval request is also issued by placing the previously presented first input content (G5) into the first slot of the retrieval request (RT1). Based on this request, the most highly activated (above threshold) chunk that starts with this input (RT1=V2) should be retrieved from storage to the memory buffer. In this scenario, we do not place additional inputs into the retrieval request, like many of the act-r related simulations. Instead we let the total current chunk associations to decide the winner. But we still need something to issue a retrieval request, so we input G5. Notice that in this scenario because the internal contexts have been changed (for instance, when new input has been encoded, or old memory has been retrieved), the most highly activated chunk may vary. This likely differs from the chunk retrieved during the presentation of the first input.
+
+  operator i_pos2-rt {
+    V1 <> nil
+    WM1 <> nil
+    WM2 = nil   // relevant WM slot to be encoded
+    V8 <> nil
+    ==>
+    nil -> V8   // refractory
+    G5 -> RT1   // retrieval request
+    two -> G3
+  }
+
+  operator i_pos3-rt {
+    V1 <> nil
+    WM2 <> nil
+    WM3 = nil   // relevant WM slot to be encoded
+    V8 <> nil
+    ==>
+    nil -> V8   // refractory
+    G5 -> RT1   // retrieval request
+    three -> G3
+  }
+
+  operator i_pos4-rt4 {
+    V1 <> nil
+    WM3 <> nil
+    WM4 = nil   // relevant WM slot to be encoded
+    V8 <> nil
+    ==>
+    nil -> V8   // refractory
+    G5 -> RT1   // retrieval request
+    four -> G3
+  }
+
+
+////////////////////////
+//  AUDICON ENCODING   //
+//////////////////////////
+
+  // The current input is then encoded into the audicon after the retrieval request. The audicon is encoded with one additional content at a time. The content is added successively to the next empty slot/position.
+  
+  // G2 collects subjective position
+
+  operator i_pos1-wm1 {
+    G3 = one    // input retrieval request must be done
+    V1 <> nil   // !! Input check-ups must be started from the beginning !!
+    WM1 = nil   // relevant WM slot to be encoded
+    ==>
+    V2 -> WM1   // relevant WM slot encoded
+    G5 -> RT1   // retrieval request
+    one -> G2
+    nil -> V1   // refractory
+  }
+
+  operator i_pos2-wm2 {
+    G3 = two
+    V1 <> nil
+    WM1 <> nil
+    WM2 = nil   // relevant WM slot to be encoded
+    ==>
+    V2 -> WM2   // relevant WM slot encoded
+    G5 -> RT1   // retrieval request
+    two -> G2
+    nil -> V1   // refractory
+  }
+
+  operator i_pos3-wm3 {
+    G3 = three
+    V1 <> nil
+    WM2 <> nil
+    WM3 = nil   // relevant WM slot to be encoded
+    ==>
+    V2 -> WM3   // relevant WM slot encoded
+    G5 -> RT1   // retrieval request
+    three -> G2
+    nil -> V1   // refractory
+  }
+
+  operator i_pos4-wm4 {
+    G3 = four
+    V8 = nil
+    V1 <> nil
+    WM3 <> nil
+    WM4 = nil   // relevant WM slot to be encoded
+    ==>
+    V2 -> WM4   // relevant WM slot encoded
+    G5 -> RT1   // retrieval request
+    four -> G2
+    nil -> V1   // refractory
+  }
+  
+  // Currently, we only instantiate encoding operations to the 4th position. This is based on convenience and it is principally possible to encode until a much later sequential position.
+  
+  operator i_outofbound { // differnce between out and clear is that out is not rewarded
+    WM4 <> nil
+    WM5 = nil   // relevant WM slot to be encoded
+    ==>
+    nil -> WM0
+  }
+  
+////////////////////////////////////////////////////////////
+//  INPUT-AUDICON COMPARISONS (BEFORE AUDICON ENCODIING)   //
+//////////////////////////////////////////////////////////////
+
+  // Before the input is encoded and cleared, the input content can be compared to contents within the audicon buffer. As described above, the model incorporates the objective position (G4) and in the operation label (e.g., pos1) to make sense of what the model is doing in a specific pattern position.
+  
+  // A mismatch operation can be selected. But in this case, it wouldn't lead to any procedural outcome that entails the reinforcement of the model.
+  
+  // At position 2, V2 can be mismatched with WM1
+  
+  operator pos2v2<>wm1 {
+    V1 <> nil
+    V2 <> WM1
+    V1 = two
+    WM1 <> nil
+    WM2 = nil   // relevant WM slot to be encoded
+    V10 <> nil
+    ==>
+    nil -> V10   // refractory
+  }
+  
+  // At position 3, V2 can be mismatched with WM1 and WM2
+  
+  operator pos3v2<>wm1 {
+    V1 <> nil
+    V2 <> WM1
+    V1 = three
+    WM2 <> nil
+    WM3 = nil   // relevant WM slot to be encoded
+    V10 <> nil
+    ==>
+    nil -> V10   // refractory
+  }
+
+  operator pos3v2<>wm2 {
+    V1 <> nil
+    V2 <> WM2
+    V1 = three
+    WM2 <> nil
+    WM3 = nil   // relevant WM slot to be encoded
+    V10 <> nil
+    ==>
+    nil -> V10   // refractory
+  }
+  
+  // A match operation can be selected. And in this case, it would lead to any procedural outcome that entails the reinforcement of the model (SAMENESS STRATEGY).
+  
+  // At position 2, V2 can be matched with WM1
+  
+  operator pos2v2=wm1 {
+    V1 <> nil
+    V2 = WM1
+    V1 = two
+    WM1 <> nil
+    WM2 = nil   // relevant WM slot to be encoded
+    V10 <> nil
+    ==>
+    nil -> V10   // refractory
+    one -> AC1
+    one -> AC2
+    nil -> WM0
+    one -> V1
+    nil -> G4
+  }
+  
+  // At position 3, V2 can be matched with WM1 and WM2
+  
+  operator pos3v2=wm1 {
+    V1 <> nil
+    V2 = WM1
+    V1 = three
+    WM2 <> nil
+    WM3 = nil   // relevant WM slot to be encoded
+    V10 <> nil
+    ==>
+    nil -> V10   // refractory
+    one -> AC1
+    one -> AC2
+    nil -> WM0
+    one -> V1
+    nil -> G4
+  }
+
+  operator pos3v2=wm2 {
+    V1 <> nil
+    V2 = WM2
+    V1 = three
+    WM2 <> nil
+    WM3 = nil   // relevant WM slot to be encoded
+    V10 <> nil
+    ==>
+    nil -> V10   // refractory
+    one -> AC1
+    one -> AC2
+    nil -> WM0
+    one -> V1
+    nil -> G4
+  }
+
+///////////////////////////////////////////////////////////
+//  INPUT-MEMORY COMPARISONS (BEFORE AUDICON ENCODIING)   //
+/////////////////////////////////////////////////////////////
+  
+  // Before the input is encoded and cleared, the input content can be compared to contents within the memory buffer retrieved from long term storage. As described above, the model incorporates the objective position (G4) and in the operation label (e.g., pos1) to make sense of what the model is doing in a specific pattern position. The relative position is checked in G2 to prevent the comparison of the first memory slot when the model is encoding the very first input.
+  
+  // A mismatch operation can be selected. But in this case, it wouldn't lead to any procedural outcome that entails the reinforcement of the model.
+  
+//  operator pos1v2<>rt1 {  // this op will never be selected
+//    V1 <> nil   // immediate input not encoded
+//    V1 = one
+//    V2 <> RT1
+//    WM1 = nil   // relevant WM slot to be encoded
+//    V3 <> nil
+//    ==>
+//    nil -> V3   // refractory
+//  }
+  
+  operator pos1v2<>rt2 {
+    V1 <> nil   // immediate input not encoded
+    V1 = one
+    V2 <> RT2
+    WM1 = nil   // relevant WM slot to be encoded
+    V3 <> nil
+    ==>
+    nil -> V3   // refractory
+  }
+
+  operator pos1v2<>rt3 {
+    V1 <> nil   // immediate input not encoded
+    V1 = one
+    V2 <> RT3
+    WM1 = nil   // relevant WM slot to be encoded
+    V4 <> nil
+    ==>
+    nil -> V4   // refractory
+  }
+
+  operator pos2v2<>rt1 {
+    V1 <> nil   // immediate input not encoded
+    V1 = two
+    V2 <> RT1
+    WM1 <> nil
+    WM2 = nil   // relevant WM slot to be encoded
+    V3 <> nil
+    ==>
+    nil -> V3   // refractory
+  }
+
+  operator pos2v2<>rt2 {
+    V1 <> nil   // immediate input not encoded
+    V1 = two
+    V2 <> RT2
+    WM1 <> nil
+    WM2 = nil   // relevant WM slot to be encoded
+    V4 <> nil
+    ==>
+    nil -> V4   // refractory
+  }
+  
+  operator pos2v2<>rt3 {
+    V1 <> nil   // immediate input not encoded
+    V1 = two
+    V2 <> RT3
+    WM1 <> nil
+    WM2 = nil   // relevant WM slot to be encoded
+    V5 <> nil
+    ==>
+    nil -> V5   // refractory
+  }
+
+  operator pos3v2<>rt1 {
+    V1 <> nil   // immediate input not encoded
+    V1 = three
+    V2 <> RT1
+    WM2 <> nil
+    WM3 = nil   // relevant WM slot to be encoded
+    V3 <> nil
+    ==>
+    nil -> V3   // refractory
+  }
+  
+  operator pos3v2<>rt2 {
+    V1 <> nil   // immediate input not encoded
+    V1 = three
+    V2 <> RT2
+    WM2 <> nil
+    WM3 = nil   // relevant WM slot to be encoded
+    V4 <> nil
+    ==>
+    nil -> V4   // refractory
+  }
+  
+  operator pos3v2<>rt3 {
+    V1 <> nil   // immediate input not encoded
+    V1 = three
+    V2 <> RT3
+    WM2 <> nil
+    WM3 = nil   // relevant WM slot to be encoded
+    V6 <> nil
+    ==>
+    nil -> V5   // refractory
+  }
+  
+  // A match operation can be selected. And in this case, it would lead to any procedural outcome that entails the reinforcement of the model (SAMENESS STRATEGY).
+  
+//  operator pos1v2=rt1 {
+//    V1 <> nil   // immediate input not encoded
+//    V1 = one
+//    V2 = RT1
+//    WM1 = nil   // relevant WM slot to be encoded
+//    V3 <> nil
+//    ==>
+//    one -> AC1
+//    one -> AC2
+//    nil -> WM0
+//    nil -> V3   // refractory
+//    one -> V1
+//    nil -> G4
+//  }
+  
+  operator pos1v2=rt2 {
+    V1 <> nil   // immediate input not encoded
+    V1 = one
+    V2 = RT2
+    WM1 = nil   // relevant WM slot to be encoded
+    V3 <> nil
+    ==>
+    one -> AC1
+    one -> AC2
+    nil -> WM0
+    nil -> V3   // refractory
+    one -> V1
+    nil -> G4
+  }
+
+  operator pos1v2=rt3 {
+    V1 <> nil   // immediate input not encoded
+    V1 = one
+    V2 = RT3
+    WM1 = nil   // relevant WM slot to be encoded
+    V4 <> nil
+    ==>
+    one -> AC1
+    one -> AC2
+    nil -> WM0
+    nil -> V4   // refractory
+    one -> V1
+    nil -> G4
+  }
+
+  operator pos2v2=rt1 {
+    V1 <> nil   // immediate input not encoded
+    V1 = two
+    V2 = RT1
+    WM1 <> nil
+    WM2 = nil   // relevant WM slot to be encoded
+    V3 <> nil
+    ==>
+    one -> AC1
+    one -> AC2
+    nil -> WM0
+    nil -> V3   // refractory
+    one -> V1
+    nil -> G4
+  }
+
+  operator pos2v2=rt2 {
+    V1 <> nil   // immediate input not encoded
+    V1 = two
+    V2 = RT2
+    WM1 <> nil
+    WM2 = nil   // relevant WM slot to be encoded
+    V4 <> nil
+    ==>
+    one -> AC1
+    one -> AC2
+    nil -> WM0
+    nil -> V4   // refractory
+    one -> V1
+    nil -> G4
+  }
+  
+  operator pos2v2=rt3 {
+    V1 <> nil   // immediate input not encoded
+    V1 = two
+    V2 = RT3
+    WM1 <> nil
+    WM2 = nil   // relevant WM slot to be encoded
+    V5 <> nil
+    ==>
+    one -> AC1
+    one -> AC2
+    nil -> WM0
+    nil -> V5   // refractory
+    one -> V1
+    nil -> G4
+  }
+
+  operator pos3v2=rt1 {
+    V1 <> nil   // immediate input not encoded
+    V1 = three
+    V2 = RT1
+    WM2 <> nil
+    WM3 = nil   // relevant WM slot to be encoded
+    V3 <> nil
+    ==>
+    one -> AC1
+    one -> AC2
+    nil -> WM0
+    nil -> V3   // refractory
+    one -> V1
+    nil -> G4
+  }
+  
+  operator pos3v2=rt2 {
+    V1 <> nil   // immediate input not encoded
+    V1 = three
+    V2 = RT2
+    WM2 <> nil
+    WM3 = nil   // relevant WM slot to be encoded
+    V4 <> nil
+    ==>
+    one -> AC1
+    one -> AC2
+    nil -> WM0
+    nil -> V4   // refractory
+    one -> V1
+    nil -> G4
+  }
+
+  operator pos3v2=rt3 {
+    V1 <> nil   // immediate input not encoded
+    V1 = three
+    V2 = RT3
+    WM2 <> nil
+    WM3 = nil   // relevant WM slot to be encoded
+    V5 <> nil
+    ==>
+    one -> AC1
+    one -> AC2
+    nil -> WM0
+    nil -> V5   // refractory
+    one -> V1
+    nil -> G4
+  }
+
+////////////////////////////////////////////////////////////
+//  AUDICON-MEMORY COMPARISONS (AFTER AUDICON ENCODIING)   //
+//////////////////////////////////////////////////////////////
+
+  
+  operator pos1wm1=rt1 {
+    G2 = one
+    V1 = nil
+    
+    WM1 <> nil
+    WM2 = nil
+    
+    WM1 = RT1
+    RT1 <> error
+    V6 <> nil
+    ==>
+    nil -> V6
+  }
+
+  operator pos2wm1=rt1 {
+    G2 = two
+    V1 = nil
+    
+    WM2 <> nil
+    WM3 = nil
+    
+    WM1 = RT1
+    RT1 <> error
+    V6 <> nil
+    ==>
+    nil -> V6
+  }
+
+  operator pos2wm2=rt2 {
+    G2 = two
+    V1 = nil
+    
+    WM2 <> nil
+    WM3 = nil
+    
+    WM2 = RT2
+    RT1 <> error
+    V7 <> nil
+    ==>
+    nil -> V7
+  }
+  
+  operator pos3wm1=rt1 {
+    G2 = three
+    V1 = nil
+    
+    WM3 <> nil
+    WM4 = nil
+    
+    WM1 = RT1
+    RT1 <> error
+    V6 <> nil
+    ==>
+    nil -> V6
+  }
+
+  operator pos3wm2=rt2 {
+    G2 = three
+    V1 = nil
+    
+    WM3 <> nil
+    WM4 = nil
+    
+    WM2 = RT2
+    RT1 <> error
+    V7 <> nil
+    ==>
+    nil -> V7
+  }
+
+  operator pos3wm3=rt3 {
+    G2 = three
+    V1 = nil
+    
+    WM3 <> nil
+    WM4 = nil
+    
+    WM3 = RT3
+    RT1 <> error
+    V9 <> nil
+    ==>
+    nil -> V9
+  }
+
+
+
+
+  operator pos1wm1<>rt1 {
+    G2 = one
+    V1 = nil
+    WM1 <> nil
+    WM2 = nil
+    WM1 <> RT1
+    RT1 <> error
+    V6 <> nil
+    ==>
+    nil -> V6
+    one -> AC1
+    one -> AC2
+    nil -> WM0
+    one -> V1
+    nil -> G3
+    nil -> G4
+  }
+
+  operator pos2wm1<>rt1 {
+    G2 = two
+    V1 = nil
+    WM2 <> nil
+    WM3 = nil
+    WM1 <> RT1
+    RT1 <> error
+    V6 <> nil
+    ==>
+    nil -> V6
+    one -> AC1
+    one -> AC2
+    nil -> WM0
+    one -> V1
+    nil -> G3
+    nil -> G4
+  }
+
+  operator pos2wm2<>rt2 {
+    G2 = two
+    V1 = nil
+    WM2 <> nil
+    WM3 = nil
+    WM2 <> RT2
+    RT1 <> error
+    V7 <> nil
+    ==>
+    nil -> V7
+    one -> AC1
+    one -> AC2
+    nil -> WM0
+    one -> V1
+    nil -> G3
+    nil -> G4
+  }
+  
+  operator pos3wm1<>rt1 {
+    G2 = three
+    V1 = nil
+    WM3 <> nil
+    WM4 = nil
+    WM1 <> RT1
+    RT1 <> error
+    V6 <> nil
+    ==>
+    nil -> V6
+    one -> AC1
+    one -> AC2
+    nil -> WM0
+    one -> V1
+    nil -> G3
+    nil -> G4
+  }
+
+  operator pos3wm2<>rt2 {
+    G2 = three
+    V1 = nil
+    WM3 <> nil
+    WM4 = nil
+    WM2 <> RT2
+    RT1 <> error
+    V7 <> nil
+    ==>
+    nil -> V7
+    one -> AC1
+    one -> AC2
+    nil -> WM0
+    one -> V1
+    nil -> G3
+    nil -> G4
+  }
+
+  operator pos3wm3<>rt3 {
+    G2 = three
+    V1 = nil
+    WM3 <> nil
+    WM4 = nil
+    WM3 <> RT3
+    RT1 <> error
+    V9 <> nil
+    ==>
+    nil -> V9
+    one -> AC1
+    one -> AC2
+    nil -> WM0
+    one -> V1
+    nil -> G3
+    nil -> G4
+  }
+  
+  
+//////////////////////////////////////////////////////////
+//  CLEAR BUFFERS WHEN PATTERN ENDED (NO REINFORCEMENT)  //
+////////////////////////////////////////////////////////////
+   
+  operator gapint {
+    G1 <> nil
+    V2 = gap
+    ==>
+    //one -> AC1
+    //one -> AC2
+    nil -> WM0
+    nil -> V2
+    one -> V1
+    nil -> G4
+  }
+  
+}
+
+
+define facts {
+
+    (le le)
+    (wi wi)
+    (ji ji)
+    (de de)
+
+    (di di)
+    (je je)
+    (li li)
+    (we we)
+  
+   (gap gap)
+  
+   (nil nil)
+
+}
+
+define init-script {
+    set-graph-title("proportion of segment operations")
+    set-average-window(100)
+    pos = []
+    no = 0
+    for n in 0 to 40 {
+      pos[n] = "p" + no
+      add-dm(pos[n], pos[n])
+      set-activation(pos[n], 0.0)
+      no = no + 1
+    }
+}
+
+define script {
+  trace-operators("true")
+ 
+  set = [
+    ["pel", "wadim", "rud"], ["vot", "wadim", "jic"], // ["dak", "wadim", "tood"],         // 1
+    ["pel", "kicey", "rud"], ["vot", "kicey", "jic"], // ["dak", "kicey", "tood"],         // 2
+    ["pel", "puser", "rud"], ["vot", "puser", "jic"], // ["dak", "puser", "tood"],         // 3
+    ["pel", "fengle", "rud"], ["vot", "fengle", "jic"], // ["dak", "fengle", "tood"],      // 4
+    ["pel", "coomo", "rud"], ["vot", "coomo", "jic"], // ["dak", "coomo", "tood"],         // 5
+    ["pel", "loga", "rud"], ["vot", "loga", "jic"], // ["dak", "loga", "tood"],            // 6
+    ["pel", "gople", "rud"], ["vot", "gople", "jic"], // ["dak", "gople", "tood"],         // 7
+    ["pel", "taspu", "rud"], ["vot", "taspu", "jic"], // ["dak", "taspu", "tood"],         // 8
+    ["pel", "hiftam", "rud"], ["vot", "hiftam", "jic"], // ["dak", "hiftam", "tood"],      // 9
+    ["pel", "deecha", "rud"], ["vot", "deecha", "jic"], // ["dak", "deecha", "tood"],      // 10
+    ["pel", "vamey", "rud"], ["vot", "vamey", "jic"], // ["dak", "vamey", "tood"],         // 11
+    ["pel", "skiger", "rud"], ["vot", "skiger", "jic"], // ["dak", "skiger", "tood"],      // 12
+    ["pel", "benez", "rud"], ["vot", "benez", "jic"], // ["dak", "benez", "tood"],         // 13
+    ["pel", "gensim", "rud"], ["vot", "gensim", "jic"], // ["dak", "gensim", "tood"],      // 14
+    ["pel", "feenam", "rud"], ["vot", "feenam", "jic"], // ["dak", "feenam", "tood"],      // 15
+    ["pel", "laeljeen", "rud"], ["vot", "laeljeen", "jic"], // ["dak", "laeljeen", "tood"],// 16
+    ["pel", "chila", "rud"], ["vot", "chila", "jic"], // ["dak", "chila", "tood"],         // 17
+    ["pel", "roosa", "rud"], ["vot", "roosa", "jic"], // ["dak", "roosa", "tood"],         // 18
+    ["pel", "plizet", "rud"], ["vot", "plizet", "jic"], // ["dak", "plizet", "tood"],      // 19
+    ["pel", "balip", "rud"], ["vot", "balip", "jic"], // ["dak", "balip", "tood"],         // 20
+    ["pel", "malsig", "rud"], ["vot", "malsig", "jic"], // ["dak", "malsig", "tood"],      // 21
+    ["pel", "suleb", "rud"], ["vot", "suleb", "jic"], // ["dak", "suleb", "tood"],         // 22
+    ["pel", "nilbo", "rud"], ["vot", "nilbo", "jic"], // ["dak", "nilbo", "tood"],         // 23
+    ["pel", "wiffle", "rud"], ["vot", "wiffle", "jic"], // ["dak", "wiffle", "tood"]       // 24
+    ]
+ 
+  num_of_words = 10                                         // number of words to be presented***
+  num_of_syls = 3                                           // number of sylls in each word***
+  contain_isi = 1                                           // no in Saffran, yes in Marcus Gomez
+  words = num_of_words - 1                                  // to cal. i
+  positions = num_of_words * (num_of_syls + contain_isi)    // to cal. total number of positions
+  
+  list = []
+  for i in 0 to words {
+  k = random(length(set)+1)-1 // random() starts from 1 whereas length() starts from 0
+  print("k: ",k)
+  pattern = set[k]
+  list[i*4 + 0] = pattern[0]
+  list[i*4 + 1] = pattern[1]
+  list[i*4 + 2] = pattern[2]
+  list[i*4 + 3] = "isi"
+  }
+  list = list
+  print(list)
+  len = length(list)
+  print("len: ", len)
+  
+  pos = []
+  // the absolute position numbers to keep track what the model is actually performing
+  no = ["zero", "one", "two", "three", "four",
+                "one", "two", "three", "four",
+                "one", "two", "three", "four",
+                "one", "two", "three", "four",
+                "one", "two", "three", "four", // 05
+                "one", "two", "three", "four",
+                "one", "two", "three", "four",
+                "one", "two", "three", "four",
+                "one", "two", "three", "four",
+                "one", "two", "three", "four", // 10
+                "one", "two", "three", "four"]
+                
+  for n in 0 to positions {
+    pos[n] = no[n]
+  }
+  pos = pos
+  
+  syllablelength = 0.50                          // len of one syll***
+  onset_to_onset = 0.50                          // len frm one syll to next***
+  tnextsylend = 0.0                              // onset of next syll
+  dt = 0.0                                       // left-over len for each syllable
+  fraction = 0.0                                 // minimal duration for a syll. to be processed
+  run_length = onset_to_onset * 5                // len of one regularity***
+  inter_reg_patterns = run_length - onset_to_onset * num_of_syls
+  inter_reg = inter_reg_patterns - onset_to_onset  // this is just a term for calculating next syl end
+  
+  // gap between adjacent words
+  resttime = 0.0                                 // duration from reward to syll. end when the model is not doing anything
+  
+  run_start = 0.0                                 // start of model run
+  training_length = 0.0                           // len of training phase (set only for test models)***
+  from_training = 0.0                             // if exist multiple test/transfer runs after "training"
+  remainder = 0.0                                 // leak time from last model run when the process went over the end
+  
+trial-start()
+
+  syllablechange = 0                              // +1 when item is the next syll
+  trialchange = 0                                 // 1 when item is the first syll of next trial
+  syllableno = 1                                  // obj. syll number within the word
+  syl = 1                                         // subj. position number of syll - matters which wm slot to encode next
+  num_i = -1                                      // syll number of the entire model run
+  isi = 0                                         // test whether it's time for an interstimulus interval
+  
+   subj_seg_start = 0.0                            // time to ...
+   subj_seg_end = 0.0                              // ... to reward
+   latency = 0.0                                   // this resets reward value
+   rwd0 = 10.0                                     // reward magnitude
+   rwd = 0.0                                       // reward magnitude initiation
+  
+  for i in 0 to len {
+  
+    num_i = num_i + 1                         // enumerate syll_#, the number of syll
+    print("num_i: ", num_i)                   // the initial num_1 is -1 as defined in [8]
+                                              // which will be added to 0 with the first syll
+
+    reg_no = int(num_i / (num_of_syls + contain_isi))   // enumerate reg_#, the number of word tokens
+    print("reg_no: ", reg_no)                 // (e.g., for a list of trisyll. sequence "je, je, de, we, we, le,
+                                              // we, we, le,", the model has reached syll_#9 or reg_#3)
+
+    // for conditional test when the syll is an isi
+    isi = reg_no * (num_of_syls + contain_isi)          // the next syll position of isi is calculated by
+    isi = isi + num_of_syls                   // the token+isi length is num_of_syls added by the one isi position
+    print("isi: ", isi)                       // which times the current token number 'reg_no' added by the num_of_syls
+                                              // in other words, when freshed with this isi number before processing the next syll
+                          // the next syll should be an isi
+                
+    if (i == 0) {
+        run_start = time()
+        from_training = run_start - training_length
+        print("from training ", from_training)
+        
+        remainder = from_training - run_length * int(from_training/run_length)
+        if (remainder > 0) {
+          remainder = remainder
+        } else {
+          remainder = 0.0
+        }
+        print("remainder: ", remainder)
+        
+        tnextsylend = (run_start - remainder) + onset_to_onset * (num_i + 1) // Ref. 01'
+        tnextsylend = tnextsylend + reg_no * inter_reg // + inter_reg/word interval if neccessary
+        print("nextsylend: ", tnextsylend)
+        
+        subj_seg_start = time()
+
+        dt = tnextsylend - subj_seg_start
+        
+        fraction = 0.02 + onset_to_onset - syllablelength     // abs. thrhd. 20 ms + inter-syll. interval [5]
+        fraction = fraction / onset_to_onset            // the fraction% is ref. to `onset_to_onset` in [5]
+        
+        // CONDITION-01: dt <= fraction of syll.
+        // presentation time (dt) is too short
+        // ignore syll.
+    
+        if (dt <= onset_to_onset * fraction) {
+
+            // print and trace the onset of current syllable
+            print("")
+            printtime = tnextsylend - onset_to_onset
+            print("TIME: ", printtime)
+            data-line("currenttime", printtime)
+            
+            // since the presentation duration is too short
+            // no syllable was processed by the model
+            print(i, pos[syllableno], ": ", list[i],": item passed before notice (M-I-S-S) ", time()) // now instead of pos[syl]
+            plot-point(0)
+
+            // move to next syll. without seg/reward
+            syllablechange = i
+            trialchange = 0
+            
+            // run until end of syll.
+            resttime = tnextsylend - time()
+            if (resttime >= 0) {
+                run-relative-time(resttime)
+                print("resttime: ", resttime)
+            }
+            
+            syllableno = syllableno + 1 // obj. position one step forward
+            syl = syl                   // subj. position stay put, since syll. not processed
+
+        }
+        
+    else {
+
+        // CONDITION-02:
+        // presentation time (dt) is not too short
+        // encode syll.
+
+            // print and trace the onset of current syllable
+            print("")
+            printtime = tnextsylend - onset_to_onset
+            print("TIME: ", printtime)
+            data-line("currenttime", printtime)
+        
+            // syllable was processed by the model
+            print(i, pos[syllableno], ": ", list[i],": item processed and encoded (Y-E-S) ", time()) // now instead of pos[syl]
+            screen(pos[syllableno], list[i], "empty", "empty", "empty", "empty", "empty", "empty", "empty", "empty", "empty", "empty", "empty", "empty", "empty", "empty", "empty", "empty", "empty", "empty") // now instead of pos[syl]
+            run-relative-time(dt, "one")
+            
+            // initiate ac-last
+            ac-last = last-action()
+            
+            // to calculate reward
+            subj_seg_end = time()
+            
+            // [0] no reward
+            if (ac-last[0] != "one") {
+                
+                plot-point(0)
+                
+                // move to next syll. without seg.
+                syllablechange = i
+                trialchange = 0
+                
+                //
+                //issue-neg-reward()
+
+                // run until end of syll.
+                resttime = tnextsylend - time()
+                if (resttime >= 0) {
+                    run-relative-time(resttime)
+                    print("resttime: ", resttime)
+                }
+
+                syllableno = syllableno + 1 // obj. position one step forward
+                syl = syl + 1               // subj. position one step forward
+
+            }
+            
+        else {
+            
+            // [1] reward without segmentation
+            if (ac-last[1] == "rewarda") {
+                
+                plot-point(1)
+                
+                // move to next syll. without seg.
+                syllablechange = i
+                trialchange = 0
+                
+                // reset reward to rwd0
+                latency = subj_seg_end - subj_seg_start
+                rwd = latency + rwd0
+                issue-reward()
+                issue-neg-reward()
+                subj_seg_start = time()
+
+                // run until end of syll.
+                resttime = tnextsylend - time()
+                if (resttime >= 0) {
+                    run-relative-time(resttime)
+                    print("resttime: ", resttime)
+                }
+
+                // position changes
+                syllableno = syllableno + 1 // obj. position one step forward
+                syl = syl + 1               // subj. position one step forward
+                
+            }
+            
+
+
+        else {
+            
+            // [2] reward with segmentation
+            if (ac-last[1] == "one") {
+                
+                plot-point(1)
+                
+                // move to next syll. with seg.
+                trialchange = i
+                syllablechange = 0
+                
+                // reset reward to rwd0
+                latency = subj_seg_end - subj_seg_start
+                rwd = latency + rwd0
+                issue-reward()
+                issue-neg-reward()
+                subj_seg_start = time()
+
+                // run until end of syll.
+                resttime = tnextsylend - time()
+                if (resttime >= 0) {
+                    run-relative-time(resttime)
+                    print("resttime: ", resttime)
+                }
+
+                // position changes
+                syllableno = syllableno +1 // obj. position one step forward
+                syl = 1           // reset subj. position
+               
+                }
+            }
+            }
+        }  // end of condition 2
+        
+    }
+    
+    else {
+    if ((i == syllablechange + 1) && (i != len) && (i != isi)) {
+    
+        // cal. exact end of upcoming syll.
+        tnextsylend = (run_start - remainder) + onset_to_onset * (num_i + 1) // Ref. 01'
+        tnextsylend = tnextsylend + reg_no * inter_reg // + inter_reg/word interval if neccessary
+        print("nextsylend: ", tnextsylend)
+        
+        // current time
+        time = time()
+        
+        // after Ref. 01, this test whether runtime is out of bound
+        // as referring to the end of next syll. (see CONDITION-01/02)
+        dt = tnextsylend - time
+        
+    fraction = 0.02 + onset_to_onset - syllablelength     // abs. thrhd. 20 ms + inter-syll. interval [5]
+    fraction = fraction / onset_to_onset            // the fraction% is ref. to `onset_to_onset` in [5]
+
+        // CONDITION-01:
+        // presentation time (dt) is too short
+        // encode no syll.
+        
+        if (dt <= onset_to_onset * fraction) {
+
+            // print and trace the onset of current syllable
+            print("")
+            printtime = tnextsylend - onset_to_onset
+            print("TIME: ", printtime)
+            data-line("currenttime", printtime)
+            
+            // since the presentation duration is too short
+            // no syllable was processed by the model
+            print(i, pos[syllableno], ": ", list[i],": item passed before notice (M-I-S-S) ", time()) // now instead of pos[syl]
+            plot-point(0)
+
+            // move to next syll. without seg/reward
+            syllablechange = i
+            trialchange = 0
+            
+            // run until end of syll.
+            resttime = tnextsylend - time()
+            if (resttime >= 0) {
+                run-relative-time(resttime)
+                print("resttime: ", resttime)
+            }
+            
+            syllableno = syllableno + 1 // obj. position one step forward
+            syl = syl                   // subj. position stay put, since syll. not processed
+
+        }
+        
+    else {
+
+        // CONDITION-02: dt >= 0
+        // presentation time (dt) is not too short
+        // encode syll.
+
+            // print and trace the onset of current syllable
+            print("")
+            printtime = tnextsylend - onset_to_onset
+            print("TIME: ", printtime)
+            data-line("currenttime", printtime)
+        
+            // syllable was processed by the model
+            print(i, pos[syllableno], ": ", list[i],": item processed and encoded (Y-E-S) ", time()) // now instead of pos[syl]
+            screen(pos[syllableno], list[i], "empty", "empty", "empty", "empty", "empty", "empty", "empty", "empty", "empty", "empty", "empty", "empty", "empty", "empty", "empty", "empty", "empty", "empty") // now instead of pos[syl]
+            run-relative-time(dt, "one")
+        
+            // to calculate reward
+            subj_seg_end = time()
+
+            // initiate ac-last
+            ac-last = last-action()
+            
+            // [0] no reward
+            if (ac-last[0] != "one") {
+                
+                plot-point(0)
+                
+                // move to next syll. without seg.
+                syllablechange = i
+                trialchange = 0
+                
+                //
+                //issue-neg-reward()
+
+                // run until end of syll.
+                resttime = tnextsylend - time()
+                if (resttime >= 0) {
+                    run-relative-time(resttime)
+                    print("resttime: ", resttime)
+                }
+
+                syllableno = syllableno + 1 // obj. position one step forward
+                syl = syl + 1               // subj. position one step forward
+
+            }
+            
+
+        else {
+            
+            // [1] reward with segmentation
+            if (ac-last[1] == "rewarda") {
+                
+                plot-point(1)
+                
+                // move to next syll. without seg.
+                syllablechange = i
+                trialchange = 0
+                
+                // reset reward to rwd0
+                latency = subj_seg_end - subj_seg_start
+                rwd = latency + rwd0
+                issue-reward()
+                issue-neg-reward()
+                subj_seg_start = time()
+
+                // run until end of syll.
+                resttime = tnextsylend - time()
+                if (resttime >= 0) {
+                    run-relative-time(resttime)
+                    print("resttime: ", resttime)
+                }
+
+                // position changes
+                syllableno = syllableno + 1 // obj. position one step forward
+                syl = syl + 1               // subj. position one step forward
+                
+            }
+            
+
+        else {
+            
+            // [2] reward with segmentation
+            if (ac-last[1] == "one") {
+                
+                plot-point(1)
+                
+                // move to next syll. with seg.
+                trialchange = i
+                syllablechange = 0
+                
+                // reset reward to rwd0
+                latency = subj_seg_end - subj_seg_start
+                rwd = latency + rwd0
+                issue-reward()
+                issue-neg-reward()
+                subj_seg_start = time()
+
+                // run until end of syll.
+                resttime = tnextsylend - time()
+                if (resttime >= 0) {
+                    run-relative-time(resttime)
+                    print("resttime: ", resttime)
+                }
+
+                // position changes
+                syllableno = syllableno + 1    // reset obj. position
+                syl = 1           // reset subj. position
+               
+                }
+            }
+            }
+        }  // end of condition 2
+
+    }
+    
+    else {
+    if ((i == trialchange + 1) && (i != len) && (i != isi)) {
+    
+        // check whether previous syll. was processed
+        //if (resttime <= onset_to_onset * fraction) {
+            syllableno = syllableno
+            syl = 1
+        //} else {
+        //    syllableno = syllableno + 1
+         //   syl = 2
+        //}
+        
+        // cal. exact end of upcoming syll.
+        tnextsylend = (run_start - remainder) + onset_to_onset * (num_i + 1) // Ref. 01'
+        tnextsylend = tnextsylend + reg_no * inter_reg // + inter_reg/word interval if neccessary
+        print("nextsylend: ", tnextsylend)
+        
+        // current time
+        time = time()
+    
+        // after Ref. 01, this test whether runtime is out of bound
+        // as referring to the end of next syll. (see CONDITION-01/02)
+        dt = tnextsylend - time
+        
+    fraction = 0.02 + onset_to_onset - syllablelength     // abs. thrhd. 20 ms + inter-syll. interval [5]
+    fraction = fraction / onset_to_onset            // the fraction% is ref. to `onset_to_onset` in [5]
+
+        // CONDITION-01:
+        // presentation time (dt) is too short
+        // encode no syll.
+        
+        if (dt <= onset_to_onset * fraction) {
+
+            // print and trace the onset of current syllable
+            print("")
+            printtime = tnextsylend - onset_to_onset
+            print("TIME: ", printtime)
+            data-line("currenttime", printtime)
+            
+            // since the presentation duration is too short
+            // no syllable was processed by the model
+            print(i, pos[syllableno], ": ", list[i],": item passed before notice (M-I-S-S) ", time()) // now instead of pos[syl]
+            plot-point(0)
+
+            // move to next syll. without seg/reward
+            syllablechange = i
+            trialchange = 0
+            
+            // run until end of syll.
+            resttime = tnextsylend - time()
+            if (resttime >= 0) {
+                run-relative-time(resttime)
+                print("resttime: ", resttime)
+            }
+            
+            syllableno = syllableno + 1 // obj. position one step forward
+            syl = syl                   // subj. position stay put, since syll. not processed
+
+        }
+        
+    else {
+
+        // CONDITION-02: dt >= 0
+        // presentation time (dt) is not too short
+        // encode syll.
+
+            // print and trace the onset of current syllable
+            print("")
+            printtime = tnextsylend - onset_to_onset
+            print("TIME: ", printtime)
+            data-line("currenttime", printtime)
+        
+            // syllable was processed by the model
+            print(i, pos[syllableno], ": ", list[i],": item processed and encoded (Y-E-S) ", time()) // now instead of pos[syl]
+            screen(pos[syllableno], list[i], "empty", "empty", "empty", "empty", "empty", "empty", "empty", "empty", "empty", "empty", "empty", "empty", "empty", "empty", "empty", "empty", "empty", "empty") // now instead of pos[syl]
+            run-relative-time(dt, "one")
+        
+            // to calculate reward
+            subj_seg_end = time()
+
+            // initiate ac-last
+            ac-last = last-action()
+            
+            // [0] no reward
+            if (ac-last[0] != "one") {
+                
+                plot-point(0)
+                
+                // move to next syll. without seg.
+                syllablechange = i
+                trialchange = 0
+                
+                //
+                //issue-neg-reward()
+
+                // run until end of syll.
+                resttime = tnextsylend - time()
+                if (resttime >= 0) {
+                    run-relative-time(resttime)
+                    print("resttime: ", resttime)
+                }
+
+                syllableno = syllableno + 1 // obj. position one step forward
+                syl = syl + 1               // subj. position one step forward
+
+            }
+            
+        else {
+            
+            // [1] reward without segmentation
+            if (ac-last[1] == "rewarda") {
+                
+                plot-point(1)
+                
+                // move to next syll. without seg.
+                syllablechange = i
+                trialchange = 0
+                
+                // reset reward to rwd0
+                latency = subj_seg_end - subj_seg_start
+                rwd = latency + rwd0
+                issue-reward()
+                issue-neg-reward()
+                subj_seg_start = time()
+
+                // run until end of syll.
+                resttime = tnextsylend - time()
+                if (resttime >= 0) {
+                    run-relative-time(resttime)
+                    print("resttime: ", resttime)
+                }
+
+                // position changes
+                syllableno = syllableno + 1 // obj. position one step forward
+                syl = syl + 1               // subj. position one step forward
+                
+            }
+            
+
+        else {
+            
+            // [2] reward with segmentation
+            if (ac-last[1] == "one") {
+                
+                plot-point(1)
+                
+                // move to next syll. with seg.
+                trialchange = i
+                syllablechange = 0
+                
+                // reset reward to rwd0
+                latency = subj_seg_end - subj_seg_start
+                rwd = latency + rwd0
+                issue-reward()
+                issue-neg-reward()
+                subj_seg_start = time()
+
+                // run until end of syll.
+                resttime = tnextsylend - time()
+                if (resttime >= 0) {
+                    run-relative-time(resttime)
+                    print("resttime: ", resttime)
+                }
+
+                // position changes
+                syllableno = syllableno + 1    // (don't) reset obj. position
+                syl = 1           // reset subj. position
+               
+                }
+            }
+            }
+        }  // end of condition 2
+        
+    }
+    
+    else {
+    if (i == isi) {
+        print("")
+        // cal. exact end of upcoming gap interval
+        tnextsylend = (run_start - remainder) + run_length * (reg_no + 1)
+        print("nextsylend: ", tnextsylend)
+
+        // current time
+        time = time()
+    
+        // after Ref. 01, this test whether runtime is out of bound
+        // as referring to the end of next syll. (see CONDITION-01/02)
+        dt = tnextsylend - time
+        
+    fraction = 0.30 //+ onset_to_onset - syllablelength     // abs. thrhd. 300 ms
+    fraction = fraction / onset_to_onset            // the fraction% is ref. to `onset_to_onset` in [5]
+
+        // CONDITION-01:
+        // presentation time (dt) is too short
+        // encode no gap interval
+        
+        if (dt <= onset_to_onset * fraction) {
+
+            // print and trace the onset of current gap interval
+            print("")
+            printtime = tnextsylend - inter_reg_patterns
+            print("TIME: ", printtime)
+            data-line("currenttime", printtime)
+            
+            // since the presentation duration is too short
+            // no gap was processed by the model
+            print(i, pos[syllableno], ": ", list[i],": item passed before notice (M-I-S-S) ", time()) // now instead of pos[syl]
+            plot-point(0)
+
+            // move to next syll. without seg/reward
+            syllablechange = i
+            trialchange = 0
+            
+            // run until end of gap interval
+            resttime = tnextsylend - time()
+            if (resttime >= 0) {
+                run-relative-time(resttime)
+                print("resttime: ", resttime)
+            }
+            
+            syllableno = syllableno + 1 // obj. position move ahead
+            syl = syl                   // subj. position stay put, since syll. not processed
+
+        }
+        
+    else {
+
+        // CONDITION-02: dt >= 0
+        // presentation time (dt) is not too short
+        // encode gap interval
+
+            // print and trace the onset of current syllable
+            print("")
+            printtime = tnextsylend - inter_reg_patterns
+            print("TIME: ", printtime)
+            data-line("currenttime", printtime)
+        
+            // Gap was processed by the model
+            print(i, pos[syllableno], ": ", list[i],": item processed and encoded (Y-E-S) ", time()) // now instead of pos[syl]
+            screen("nil", "gap", "empty", "empty", "empty", "empty", "empty", "empty", "empty", "empty", "empty", "empty", "empty", "empty", "empty", "empty", "empty", "empty", "empty", "empty") // now instead of pos[syl]
+            run-relative-time(dt, "one")
+        
+            // to calculate reward
+            subj_seg_end = time()
+
+            // initiate ac-last
+            ac-last = last-action()
+            
+            // [0] no reward
+            if (ac-last[0] != "one") {
+                
+                plot-point(0)
+                
+                // move to next syll. without seg.
+                syllablechange = i
+                trialchange = 0
+
+                // run until end of syll.
+                resttime = tnextsylend - time()
+                if (resttime >= 0) {
+                    run-relative-time(resttime)
+                    print("resttime: ", resttime)
+                }
+                
+                // position changes
+                syllableno = syllableno + 1
+                syl = 1           // reset subj. position
+
+            }
+            
+        else {
+            
+            // [1] reward without segmentation
+            if (ac-last[1] == "rewarda") {
+                
+                plot-point(1)
+                
+                // move to next syll. without seg.
+                syllablechange = i
+                trialchange = 0
+                
+                // reset reward to rwd0
+                latency = subj_seg_end - subj_seg_start
+                rwd = latency + rwd0
+                issue-reward()
+                issue-neg-reward()
+                subj_seg_start = time()
+
+                // run until end of syll.
+                resttime = tnextsylend - time()
+                if (resttime >= 0) {
+                    run-relative-time(resttime)
+                    print("resttime: ", resttime)
+                }
+
+                // position changes
+                syllableno = syllableno + 1
+                syl = 1           // reset subj. position
+                
+            }
+            
+        else {
+            
+            // [2] reward with segmentation
+            if (ac-last[1] == "one") {
+                
+                plot-point(1)
+                
+                // move to next syll. with seg.
+                trialchange = i
+                syllablechange = 0
+                
+                // reset reward to rwd0
+                latency = subj_seg_end - subj_seg_start
+                rwd = latency + rwd0
+                issue-reward()
+                issue-neg-reward()
+                subj_seg_start = time()
+
+                // run until end of syll.
+                resttime = tnextsylend - time()
+                if (resttime >= 0) {
+                    run-relative-time(resttime)
+                    print("resttime: ", resttime)
+                }
+
+                // position changes
+                syllableno = syllableno + 1
+                syl = 1           // reset subj. position
+               
+                }
+            }
+            }
+        }  // end of condition 2
+    } // end of conditions
+    } // END OF D
+    } // END OF CD
+    } // END OF BCD
+  } // END OF ABCD
+  
+  trace-assocs()
+  issue-no-reward()
+  trial-end()
+  // sleep(5.0)
+}
+
