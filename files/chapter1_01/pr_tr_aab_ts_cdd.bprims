@@ -1,0 +1,4 @@
+repeat 50
+reset
+run tr_aab           M99_tr_aab           20
+run ts_cdd           M99_ts_cdd            2

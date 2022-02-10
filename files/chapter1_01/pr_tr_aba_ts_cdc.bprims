@@ -1,0 +1,4 @@
+repeat 50
+reset
+run tr_aba           M99_tr_aba           20
+run ts_cdc           M99_ts_cdc            2

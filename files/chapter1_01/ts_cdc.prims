@@ -1,4 +1,4 @@
-define task tr_aab {
+define task ts_cdc {
     initial-goals: (init)
     lf: 0.002
     // imaginal-delay as default
@@ -348,10 +348,10 @@ define script {
   trace-operators("true")
     
   set = [
-    ["le", "le", "di"], ["le", "le", "je"], ["le", "le", "li"], ["le", "le", "we"],
-    ["wi", "wi", "di"], ["wi", "wi", "je"], ["wi", "wi", "li"], ["wi", "wi", "we"],
-    ["ji", "ji", "di"], ["ji", "ji", "je"], ["ji", "ji", "li"], ["ji", "ji", "we"],
-    ["de", "de", "di"], ["de", "de", "je"], ["de", "de", "li"], ["de", "de", "we"]
+    ["ba", "po", "ba"],
+    ["ko", "ga", "ko"],
+    ["ba", "ga", "ba"],
+    ["ko", "po", "ko"]
         ]
  
   num_of_words = 5                                         // number of words to be presented***
