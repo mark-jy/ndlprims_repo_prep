@@ -1,3 +1,15 @@
+2022-Feb-10_b update_files
+in this updated files
+- the prims files are each corresponding to the task specifics
+- note that instead of present one pattern and close at trial end
+  the model now presents five continuous patterns
+- in the bprims file, the number of training trials is now 20x5, 
+  and the number of testing trials is now 2x5 
+
+2022-Feb-10_a
+add initial files, exactly identical, to the committ,
+in the next commit change them based on the specific tasks
+
 2022-Feb-10
 adjust prims file so it process multi-sequences without having
 to end the trial for a particular sequence, this is mainly 
