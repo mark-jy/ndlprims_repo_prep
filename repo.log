@@ -1,3 +1,9 @@
+2022-Feb-10
+adjust prims file so it process multi-sequences without having
+to end the trial for a particular sequence, this is mainly 
+worked out for Saffran's continuous task, but also for any of
+the early language paradigms
+
 2022-Feb-08
 
 set up repo and add currentpr.prims to be duplicated with
