@@ -1,0 +1,32 @@
+
+
+
+%% 2022年03月30号 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+今天需要做的事情，是继续准备三种 extended task 中的 .bprims 代码。可以参考
+
+实验的实际 pattern 数量（和 simulation 的数量）：
+Saffran ... 160 trls ... ( 300 )
+Marcus  ...  50 trls ... ( 100 )
+Gomez   ...  90 trls ... ( 200 )
+
+考虑这方面的内容应该在哪里交代？
+
+
+
+
+
+%% 2022年03月29号b %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+在接下来的simulation中，需要考虑一系列的问题，现在小结如下：
+1：考虑到跟发展相关的 extended phenomena
+2：到底是用das来调节时间，还是用association spreading？在这方面还要更细致地考察一下ACT-R相关的文献。可能比较倾向于用spreading，因为和surprisal和processing efficiency都相关。这方面，先看公式。
+
+
+
+%% 2022年03月29号a %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+在这篇文章中，和第一篇不同的亮点在于解释和儿童语言随龄发展的现象。所以需要一系列extended 模拟。对此，Saffran的统计学习范式在更大月龄的儿童中，应该更好地被学会，应该看到对学习和未学习pattern更大的differentiation。Marcus的范式则正好相反，在更小月龄的儿童只可以看到更明显的differentiation，但是在更大月龄的孩子中这些differentiation则会消失。在Gomez的范式中，曾经发现首先学习adjacent dependent pattern可以辅助对non-adjacent pattern的学习。这其实并不是说儿童总是用adjacent dependent pattern来学习non-adjacent pattern。而是说暴露adjacent pattern会使孩子趋向于用哪种形式去学习non-adjacent dependent pattern。
+
+In this article, the difference from the first one is the explanation and the phenomenon of children's language development with age. So a series of extended simulations are needed. In this regard, Saffran's statistical learning paradigm should be better learned in older children and should see greater differentiation between learned and unlearned patterns. Marcus's paradigm is the opposite, only more pronounced differentiations are seen in younger children, but these differentiations disappear in older children. In Gomez's paradigm, it has been found that learning the adjacent dependent pattern first can assist the learning of the non-adjacent pattern. This is not to say that children always use adjacent dependent patterns to learn non-adjacent patterns. Rather, exposing adjacent patterns tends to predispose children to learn non-adjacent dependent patterns in a particular manner.
+

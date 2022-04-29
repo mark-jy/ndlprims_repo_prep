@@ -1,33 +1,74 @@
-define task ts_cdc {
+define task ts_par_saffran {
     initial-goals: (init)
-    context-learning: t
-    dat: 0.05
-    rt: -2
-    lf: 0.005 // parameter F
-    beta: 0.0001
-    negreward: t
-    sp2bl: 1
-    ga: 1
+    lf: 0.05
+    // imaginal-delay as default
+    perception-action-latency: 0.05
+    production-prim-latency: 0.0 // lower-level timing no considered
+    // procedural-reward, egs, alpha, nu, primU as defaults
+    dat: 0.05 // we do consider operator-level timing and compilation
+    // opc: t
+    default-activation: 0 // activation-lowerbound is 0.0
+    rt: -2 // slightly higher
+    // bll, lf, ol, mas, ans as default, mp wont needed because pm is off, base-level term has a network-sense than frequentist
+    default-operator-assoc: 0.0
+    default-inter-operator-assoc: 0 // skill/operator-operator assocs now learn through context (e.g., "goal%last-operator%name") with maximum association of 1.0
+    default-operator-self-assoc: 0.0 // default self-assoc is retained to prevent repetition
+    mas: 0.0 // similarly for context-declarative assocs
+    context-learning: t // context-operator + context-declarative learning all in one
+    beta: 0.0001 // learning rate
+    // reward: 1
+    negreward: t // turn on positive and negative learning, magnitude not relevant
+    sp2bl: 2
+    ga: 2
     input-activation-op: 0
-    input-activation-ch: 1
-    retrieval-activation-op: 0
-    retrieval-activation-ch: 1
+    input-activation-ch: 2
+    retrieval-activation-op: 0 // already taken care in "ga:"
+    retrieval-activation-ch: 2
     wm-activation-op: 0
-    wm-activation-ch: 1
-    ans: 0.001
+    wm-activation-ch: 2
+    ans: 0.00001
+    explore-exploit: 0.00001
     // local-or-global: t // comment out means global
     single-or-multiple: t // multiple
-    perception-action-latency: 0.05
-    production-prim-latency: 0.0 
 
     // We define the objective and subjective sequential positions in procedural outcome definitions. The objective position is defined as the actual position of the pattern (e.g., XYZ, there are the corresponding positions from 1-3). The collection of objective positions should not matter as to how the model subjectively perceived the pattern but was nevertheless included to provide a more clear understanding of what the model is doing.
     
     outcome-ops: (
+    
         p2_v2=wm1_e2%input=audicon1_pos2_enc2
         p3_v2=wm1_e2%input=audicon1_pos3_enc2
         p3_v2=wm1_e3%input=audicon1_pos3_enc3
         p3_v2=wm2_e3%input=audicon2_pos3_enc3
+
+        p1_v2=rt2_e1%input=mem2_pos1_enc1
+        p1_v2=rt3_e1%input=mem3_pos1_enc1
+        p2_v2=rt1_e2%input=mem1_pos2_enc2
+        p2_v2=rt2_e1%input=mem2_pos2_enc1
+        p2_v2=rt2_e2%input=mem2_pos2_enc2
+        p2_v2=rt3_e1%input=mem3_pos2_enc1
+        p2_v2=rt3_e2%input=mem3_pos2_enc2
+        p3_v2=rt1_e2%input=mem1_pos3_enc2
+        p3_v2=rt1_e3%input=mem1_pos3_enc3
+        p3_v2=rt2_e1%input=mem2_pos3_enc1
+        p3_v2=rt2_e2%input=mem2_pos3_enc2
+        p3_v2=rt2_e3%input=mem2_pos3_enc3
+        p3_v2=rt3_e1%input=mem3_pos3_enc1
+        p3_v2=rt3_e2%input=mem3_pos3_enc2
+        p3_v2=rt3_e3%input=mem3_pos3_enc3
+
+        p1_wm1<>rt1_e1%audicon1<>mem1_pos1_enc1
+        p2_wm1<>rt1_e1%audicon1<>mem1_pos2_enc1
+        p2_wm1<>rt1_e2%audicon1<>mem1_pos2_enc2
+        p2_wm2<>rt2_e2%audicon2<>mem2_pos2_enc2
+        p3_wm1<>rt1_e1%audicon1<>mem1_pos3_enc1
+        p3_wm1<>rt1_e2%audicon1<>mem1_pos3_enc2
+        p3_wm1<>rt1_e3%audicon1<>mem1_pos3_enc3
+        p3_wm2<>rt2_e2%audicon2<>mem2_pos3_enc2
+        p3_wm2<>rt2_e3%audicon2<>mem2_pos3_enc3
+        p3_wm3<>rt3_e3%audicon3<>mem3_pos3_enc3
+        
         )
+                  
     }
 
 
@@ -282,7 +323,739 @@ define skill all {
     one -> V1
     nil -> G4
   }
-  
+
+///////////////////////////////////////////////////////////
+//  INPUT-MEMORY COMPARISONS (BEFORE AUDICON ENCODIING)   //
+/////////////////////////////////////////////////////////////
+  
+  // Before the input is encoded and cleared, the input content can be compared to contents within the memory buffer retrieved from long term storage. As described above, the model incorporates the objective position (G4) and in the operation label (e.g., pos1) to make sense of what the model is doing in a specific pattern position. The relative position is checked in G2 to prevent the comparison of the first memory slot when the model is encoding the very first input.
+  
+  // A mismatch operation can be selected. But in this case, it wouldn't lead to any procedural outcome that entails the reinforcement of the model.
+  
+//  operator pos1v2<>rt1 {  // this op will never be selected
+//    V1 <> nil   // immediate input not encoded
+//    V1 = one
+//    V2 <> RT1
+//    WM1 = nil   // relevant WM slot to be encoded
+//    V3 <> nil
+//    ==>
+//    nil -> V3   // refractory
+//  }
+  
+  operator p1_v2<>rt2_e1 {
+    V1 <> nil   // immediate input not encoded
+    V1 = one
+    V2 <> RT2
+    WM1 = nil   // relevant WM slot to be encoded
+    V3 <> nil
+    ==>
+    nil -> V3   // refractory
+  }
+
+  operator p1_v2<>rt3_e1 {
+    V1 <> nil   // immediate input not encoded
+    V1 = one
+    V2 <> RT3
+    WM1 = nil   // relevant WM slot to be encoded
+    V4 <> nil
+    ==>
+    nil -> V4   // refractory
+  }
+
+  operator p2_v2<>rt1_e2 {
+    V1 <> nil   // immediate input not encoded
+    V1 = two
+    V2 <> RT1
+    WM1 <> nil
+    WM2 = nil   // relevant WM slot to be encoded
+    V3 <> nil
+    ==>
+    nil -> V3   // refractory
+  }
+
+  operator p2_v2<>rt2_e2 {
+    V1 <> nil   // immediate input not encoded
+    V1 = two
+    V2 <> RT2
+    WM1 <> nil
+    WM2 = nil   // relevant WM slot to be encoded
+    V4 <> nil
+    ==>
+    nil -> V4   // refractory
+  }
+  
+  operator p2_v2<>rt3_e2 {
+    V1 <> nil   // immediate input not encoded
+    V1 = two
+    V2 <> RT3
+    WM1 <> nil
+    WM2 = nil   // relevant WM slot to be encoded
+    V5 <> nil
+    ==>
+    nil -> V5   // refractory
+  }
+
+  operator p3_v2<>rt1_e3 {
+    V1 <> nil   // immediate input not encoded
+    V1 = three
+    V2 <> RT1
+    WM2 <> nil
+    WM3 = nil   // relevant WM slot to be encoded
+    V3 <> nil
+    ==>
+    nil -> V3   // refractory
+  }
+  
+  operator p3_v2<>rt2_e3 {
+    V1 <> nil   // immediate input not encoded
+    V1 = three
+    V2 <> RT2
+    WM2 <> nil
+    WM3 = nil   // relevant WM slot to be encoded
+    V4 <> nil
+    ==>
+    nil -> V4   // refractory
+  }
+  
+  operator p3_v2<>rt3_e3 {
+    V1 <> nil   // immediate input not encoded
+    V1 = three
+    V2 <> RT3
+    WM2 <> nil
+    WM3 = nil   // relevant WM slot to be encoded
+    V5 <> nil
+    ==>
+    nil -> V5   // refractory
+  }
+
+  operator p2_v2<>rt2_e1 {
+    V1 <> nil   // immediate input not encoded
+    V1 = two
+    V2 <> RT2
+    WM1 = nil   // relevant WM slot to be encoded
+    V3 <> nil
+    ==>
+    nil -> V3   // refractory
+  }
+
+  operator p2_v2<>rt3_e1 {
+    V1 <> nil   // immediate input not encoded
+    V1 = two
+    V2 <> RT3
+    WM1 = nil   // relevant WM slot to be encoded
+    V4 <> nil
+    ==>
+    nil -> V4   // refractory
+  }
+
+  operator p3_v2<>rt1_e2 {
+    V1 <> nil   // immediate input not encoded
+    V1 = three
+    V2 <> RT1
+    WM1 <> nil
+    WM2 = nil   // relevant WM slot to be encoded
+    V3 <> nil
+    ==>
+    nil -> V3   // refractory
+  }
+
+  operator p3_v2<>rt2_e2 {
+    V1 <> nil   // immediate input not encoded
+    V1 = three
+    V2 <> RT2
+    WM1 <> nil
+    WM2 = nil   // relevant WM slot to be encoded
+    V4 <> nil
+    ==>
+    nil -> V4   // refractory
+  }
+  
+  operator p3_v2<>rt3_e2 {
+    V1 <> nil   // immediate input not encoded
+    V1 = three
+    V2 <> RT3
+    WM1 <> nil
+    WM2 = nil   // relevant WM slot to be encoded
+    V5 <> nil
+    ==>
+    nil -> V5   // refractory
+  }
+
+  operator p3_v2<>rt2_e1 {
+    V1 <> nil   // immediate input not encoded
+    V1 = three
+    V2 <> RT2
+    WM1 = nil   // relevant WM slot to be encoded
+    V3 <> nil
+    ==>
+    nil -> V3   // refractory
+  }
+
+  operator p3_v2<>rt3_e1 {
+    V1 <> nil   // immediate input not encoded
+    V1 = three
+    V2 <> RT3
+    WM1 = nil   // relevant WM slot to be encoded
+    V4 <> nil
+    ==>
+    nil -> V4   // refractory
+  }
+
+  // A match operation can be selected. And in this case, it would lead to any procedural outcome that entails the reinforcement of the model (SAMENESS STRATEGY).
+  
+//  operator p1_v2=rt1 {
+//    V1 <> nil   // immediate input not encoded
+//    V1 = one
+//    V2 = RT1
+//    WM1 = nil   // relevant WM slot to be encoded
+//    V3 <> nil
+//    ==>
+//    one -> AC1
+//    one -> AC2
+//    nil -> WM0
+//    nil -> V3   // refractory
+//    one -> V1
+//    nil -> G4
+//  }
+  
+  operator p1_v2=rt2_e1 {
+    V1 <> nil   // immediate input not encoded
+    V1 = one
+    V2 = RT2
+    WM1 = nil   // relevant WM slot to be encoded
+    V3 <> nil
+    ==>
+    one -> AC1
+    one -> AC2
+    nil -> WM0
+    nil -> V3   // refractory
+    one -> V1
+    nil -> G4
+  }
+
+  operator p1_v2=rt3_e1 {
+    V1 <> nil   // immediate input not encoded
+    V1 = one
+    V2 = RT3
+    WM1 = nil   // relevant WM slot to be encoded
+    V4 <> nil
+    ==>
+    one -> AC1
+    one -> AC2
+    nil -> WM0
+    nil -> V4   // refractory
+    one -> V1
+    nil -> G4
+  }
+
+  operator p2_v2=rt1_e2 {
+    V1 <> nil   // immediate input not encoded
+    V1 = two
+    V2 = RT1
+    WM1 <> nil
+    WM2 = nil   // relevant WM slot to be encoded
+    V3 <> nil
+    ==>
+    one -> AC1
+    one -> AC2
+    nil -> WM0
+    nil -> V3   // refractory
+    one -> V1
+    nil -> G4
+  }
+
+  operator p2_v2=rt2_e2 {
+    V1 <> nil   // immediate input not encoded
+    V1 = two
+    V2 = RT2
+    WM1 <> nil
+    WM2 = nil   // relevant WM slot to be encoded
+    V4 <> nil
+    ==>
+    one -> AC1
+    one -> AC2
+    nil -> WM0
+    nil -> V4   // refractory
+    one -> V1
+    nil -> G4
+  }
+  
+  operator p2_v2=rt3_e2 {
+    V1 <> nil   // immediate input not encoded
+    V1 = two
+    V2 = RT3
+    WM1 <> nil
+    WM2 = nil   // relevant WM slot to be encoded
+    V5 <> nil
+    ==>
+    one -> AC1
+    one -> AC2
+    nil -> WM0
+    nil -> V5   // refractory
+    one -> V1
+    nil -> G4
+  }
+
+  operator p3_v2=rt1_e3 {
+    V1 <> nil   // immediate input not encoded
+    V1 = three
+    V2 = RT1
+    WM2 <> nil
+    WM3 = nil   // relevant WM slot to be encoded
+    V3 <> nil
+    ==>
+    one -> AC1
+    one -> AC2
+    nil -> WM0
+    nil -> V3   // refractory
+    one -> V1
+    nil -> G4
+  }
+  
+  operator p3_v2=rt2_e3 {
+    V1 <> nil   // immediate input not encoded
+    V1 = three
+    V2 = RT2
+    WM2 <> nil
+    WM3 = nil   // relevant WM slot to be encoded
+    V4 <> nil
+    ==>
+    one -> AC1
+    one -> AC2
+    nil -> WM0
+    nil -> V4   // refractory
+    one -> V1
+    nil -> G4
+  }
+
+  operator p3_v2=rt3_e3 {
+    V1 <> nil   // immediate input not encoded
+    V1 = three
+    V2 = RT3
+    WM2 <> nil
+    WM3 = nil   // relevant WM slot to be encoded
+    V5 <> nil
+    ==>
+    one -> AC1
+    one -> AC2
+    nil -> WM0
+    nil -> V5   // refractory
+    one -> V1
+    nil -> G4
+  }
+
+  operator p2_v2=rt2_e1 {
+    V1 <> nil   // immediate input not encoded
+    V1 = two
+    V2 = RT2
+    WM1 = nil   // relevant WM slot to be encoded
+    V3 <> nil
+    ==>
+    one -> AC1
+    one -> AC2
+    nil -> WM0
+    nil -> V3   // refractory
+    one -> V1
+    nil -> G4
+  }
+
+  operator p2_v2=rt3_e1 {
+    V1 <> nil   // immediate input not encoded
+    V1 = two
+    V2 = RT3
+    WM1 = nil   // relevant WM slot to be encoded
+    V4 <> nil
+    ==>
+    one -> AC1
+    one -> AC2
+    nil -> WM0
+    nil -> V4   // refractory
+    one -> V1
+    nil -> G4
+  }
+
+  operator p3_v2=rt1_e2 {
+    V1 <> nil   // immediate input not encoded
+    V1 = three
+    V2 = RT1
+    WM1 <> nil
+    WM2 = nil   // relevant WM slot to be encoded
+    V3 <> nil
+    ==>
+    one -> AC1
+    one -> AC2
+    nil -> WM0
+    nil -> V3   // refractory
+    one -> V1
+    nil -> G4
+  }
+
+  operator p3_v2=rt2_e2 {
+    V1 <> nil   // immediate input not encoded
+    V1 = three
+    V2 = RT2
+    WM1 <> nil
+    WM2 = nil   // relevant WM slot to be encoded
+    V4 <> nil
+    ==>
+    one -> AC1
+    one -> AC2
+    nil -> WM0
+    nil -> V4   // refractory
+    one -> V1
+    nil -> G4
+  }
+  
+  operator p3_v2=rt3_e2 {
+    V1 <> nil   // immediate input not encoded
+    V1 = three
+    V2 = RT3
+    WM1 <> nil
+    WM2 = nil   // relevant WM slot to be encoded
+    V5 <> nil
+    ==>
+    one -> AC1
+    one -> AC2
+    nil -> WM0
+    nil -> V5   // refractory
+    one -> V1
+    nil -> G4
+  }
+
+  operator p3_v2=rt2_e1 {
+    V1 <> nil   // immediate input not encoded
+    V1 = three
+    V2 = RT2
+    WM1 = nil   // relevant WM slot to be encoded
+    V3 <> nil
+    ==>
+    one -> AC1
+    one -> AC2
+    nil -> WM0
+    nil -> V3   // refractory
+    one -> V1
+    nil -> G4
+  }
+
+  operator p3_v2=rt3_e1 {
+    V1 <> nil   // immediate input not encoded
+    V1 = three
+    V2 = RT3
+    WM1 = nil   // relevant WM slot to be encoded
+    V4 <> nil
+    ==>
+    one -> AC1
+    one -> AC2
+    nil -> WM0
+    nil -> V4   // refractory
+    one -> V1
+    nil -> G4
+  }
+
+////////////////////////////////////////////////////////////
+//  AUDICON-MEMORY COMPARISONS (AFTER AUDICON ENCODIING)   //
+//////////////////////////////////////////////////////////////
+
+  operator p1_wm1=rt1_e1 {
+    G2 = one
+    V1 = nil
+    WM1 <> nil
+    WM2 = nil
+    WM1 = RT1
+    RT1 <> error
+    V6 <> nil
+    ==>
+    nil -> V6
+  }
+
+  operator p2_wm1=rt1_e2 {
+    G2 = two
+    V1 = nil
+    WM2 <> nil
+    WM3 = nil
+    WM1 = RT1
+    RT1 <> error
+    V6 <> nil
+    ==>
+    nil -> V6
+  }
+
+  operator p2_wm2=rt2_e2 {
+    G2 = two
+    V1 = nil
+    WM2 <> nil
+    WM3 = nil
+    WM2 = RT2
+    RT1 <> error
+    V7 <> nil
+    ==>
+    nil -> V7
+  }
+
+  operator p3_wm1=rt1_e3 {
+    G2 = three
+    V1 = nil
+    WM3 <> nil
+    WM4 = nil
+    WM1 = RT1
+    RT1 <> error
+    V6 <> nil
+    ==>
+    nil -> V6
+  }
+
+  operator p3_wm2=rt2_e3 {
+    G2 = three
+    V1 = nil
+    WM3 <> nil
+    WM4 = nil
+    WM2 = RT2
+    RT1 <> error
+    V7 <> nil
+    ==>
+    nil -> V7
+  }
+
+  operator p3_wm3=rt3_e3 {
+    G2 = three
+    V1 = nil
+    WM3 <> nil
+    WM4 = nil
+    WM3 = RT3
+    RT1 <> error
+    V9 <> nil
+    ==>
+    nil -> V9
+  }
+
+  operator p2_wm1=rt1_e1 {
+    G2 = two
+    V1 = nil
+    WM1 <> nil
+    WM2 = nil
+    WM1 = RT1
+    RT1 <> error
+    V6 <> nil
+    ==>
+    nil -> V6
+  }
+
+  operator p3_wm1=rt1_e2 {
+    G2 = three
+    V1 = nil
+    WM2 <> nil
+    WM3 = nil
+    WM1 = RT1
+    RT1 <> error
+    V6 <> nil
+    ==>
+    nil -> V6
+  }
+
+  operator p3_wm2=rt2_e2 {
+    G2 = three
+    V1 = nil
+    WM2 <> nil
+    WM3 = nil
+    WM2 = RT2
+    RT1 <> error
+    V7 <> nil
+    ==>
+    nil -> V7
+  }
+
+  operator p3_wm1=rt1_e1 {
+    G2 = three
+    V1 = nil
+    WM1 <> nil
+    WM2 = nil
+    WM1 = RT1
+    RT1 <> error
+    V6 <> nil
+    ==>
+    nil -> V6
+  }
+
+  operator p1_wm1<>rt1_e1 {
+    G2 = one
+    V1 = nil
+    WM1 <> nil
+    WM2 = nil
+    WM1 <> RT1
+    RT1 <> error
+    V6 <> nil
+    ==>
+    nil -> V6
+    one -> AC1
+    one -> AC2
+    nil -> WM0
+    one -> V1
+    nil -> G3
+    nil -> G4
+  }
+
+  operator p2_wm1<>rt1_e2 {
+    G2 = two
+    V1 = nil
+    WM2 <> nil
+    WM3 = nil
+    WM1 <> RT1
+    RT1 <> error
+    V6 <> nil
+    ==>
+    nil -> V6
+    one -> AC1
+    one -> AC2
+    nil -> WM0
+    one -> V1
+    nil -> G3
+    nil -> G4
+  }
+
+  operator p2_wm2<>rt2_e2 {
+    G2 = two
+    V1 = nil
+    WM2 <> nil
+    WM3 = nil
+    WM2 <> RT2
+    RT1 <> error
+    V7 <> nil
+    ==>
+    nil -> V7
+    one -> AC1
+    one -> AC2
+    nil -> WM0
+    one -> V1
+    nil -> G3
+    nil -> G4
+  }
+
+  operator p3_wm1<>rt1_e3 {
+    G2 = three
+    V1 = nil
+    WM3 <> nil
+    WM4 = nil
+    WM1 <> RT1
+    RT1 <> error
+    V6 <> nil
+    ==>
+    nil -> V6
+    one -> AC1
+    one -> AC2
+    nil -> WM0
+    one -> V1
+    nil -> G3
+    nil -> G4
+  }
+
+  operator p3_wm2<>rt2_e3 {
+    G2 = three
+    V1 = nil
+    WM3 <> nil
+    WM4 = nil
+    WM2 <> RT2
+    RT1 <> error
+    V7 <> nil
+    ==>
+    nil -> V7
+    one -> AC1
+    one -> AC2
+    nil -> WM0
+    one -> V1
+    nil -> G3
+    nil -> G4
+  }
+
+  operator p3_wm3<>rt3_e3 {
+    G2 = three
+    V1 = nil
+    WM3 <> nil
+    WM4 = nil
+    WM3 <> RT3
+    RT1 <> error
+    V9 <> nil
+    ==>
+    nil -> V9
+    one -> AC1
+    one -> AC2
+    nil -> WM0
+    one -> V1
+    nil -> G3
+    nil -> G4
+  }
+
+  operator p2_wm1<>rt1_e1 {
+    G2 = two
+    V1 = nil
+    WM1 <> nil
+    WM2 = nil
+    WM1 <> RT1
+    RT1 <> error
+    V6 <> nil
+    ==>
+    nil -> V6
+    one -> AC1
+    one -> AC2
+    nil -> WM0
+    one -> V1
+    nil -> G3
+    nil -> G4
+  }
+
+  operator p3_wm1<>rt1_e2 {
+    G2 = three
+    V1 = nil
+    WM2 <> nil
+    WM3 = nil
+    WM1 <> RT1
+    RT1 <> error
+    V6 <> nil
+    ==>
+    nil -> V6
+    one -> AC1
+    one -> AC2
+    nil -> WM0
+    one -> V1
+    nil -> G3
+    nil -> G4
+  }
+
+  operator p3_wm2<>rt2_e2 {
+    G2 = three
+    V1 = nil
+    WM2 <> nil
+    WM3 = nil
+    WM2 <> RT2
+    RT1 <> error
+    V7 <> nil
+    ==>
+    nil -> V7
+    one -> AC1
+    one -> AC2
+    nil -> WM0
+    one -> V1
+    nil -> G3
+    nil -> G4
+  }
+
+  operator p3_wm1<>rt1_e1 {
+    G2 = three
+    V1 = nil
+    WM1 <> nil
+    WM2 = nil
+    WM1 <> RT1
+    RT1 <> error
+    V6 <> nil
+    ==>
+    nil -> V6
+    one -> AC1
+    one -> AC2
+    nil -> WM0
+    one -> V1
+    nil -> G3
+    nil -> G4
+  }
+  
 //////////////////////////////////////////////////////////
 //  CLEAR BUFFERS WHEN PATTERN ENDED (NO REINFORCEMENT)  //
 ////////////////////////////////////////////////////////////
@@ -293,20 +1066,26 @@ define skill all {
 
 define facts {
 
-    (le le)
-    (wi wi)
-    (ji ji)
-    (de de)
-
-    (di di)
-    (je je)
-    (li li)
-    (we we)
+  (pa pa)
+  (bi bi)
+  (ku ku)
   
-   (gap gap)
+  (ti ti)
+  (bu bu)
+  (do do)
   
-   (nil nil)
-
+  (go go)
+  (la la)
+  (tu tu)
+  
+  (da da)
+  (ro ro)
+  (pi pi)
+  
+  (gap gap)
+  
+  (nil nil)
+     
 }
 
 define init-script {
@@ -324,22 +1103,20 @@ define init-script {
 
 define script {
   trace-operators("true")
-  
+
   num_of_words = 5                                        // number of words to be presented***
   num_of_syls = 3                                           // number of sylls in each word***
   contain_isi = 1                                           // no in Saffran, yes in Marcus Gomez
   words = num_of_words - 1                                  // to cal. i
   positions = num_of_words * (num_of_syls + contain_isi)    // to cal. total number of positions
-    
-    
+
+
   set = [
-    ["ba", "po", "ba"],
-    ["ko", "ga", "ko"],
-    ["ba", "ga", "ba"],
-    ["ko", "po", "ko"]
-        ]
- 
-  list = []
+  // ["pa", "bi", "ku"], ["ti", "bu", "do"],    // consistent
+  ["tu", "da", "ro"], ["pi", "go", "la"]        // inconsistent
+	]
+
+list = []
   for i in 0 to words {
   k = random(length(set)+1)-1 // random() starts from 1 whereas length() starts from 0
   print("k: ",k)
@@ -1047,7 +1824,7 @@ trial-start()
                 rwd = latency + rwd0
                 issue-reward()
                 issue-neg-reward()
-                
+
                 subj_seg_start = time()
 
                 // run until end of syll.
@@ -1079,7 +1856,7 @@ trial-start()
                 rwd = latency + rwd0
                 issue-reward()
                 issue-neg-reward()
-                
+
                 subj_seg_start = time()
 
                 // run until end of syll.
@@ -1112,4 +1889,3 @@ trial-start()
   trial-end() // end of a sequence
   // sleep(5.0)
 }
-

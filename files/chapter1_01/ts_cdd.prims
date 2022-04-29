@@ -1,35 +1,24 @@
-define task ts_ccd {
+define task ts_cdd {
     initial-goals: (init)
-    lf: 0.002
-    // imaginal-delay as default
-    perception-action-latency: 0.05
-    production-prim-latency: 0.0 // lower-level timing no considered
-    // procedural-reward, egs, alpha, nu, primU as defaults
-    dat: 0.05 // we do consider operator-level timing and compilation
-    opc: t
-    default-activation: 0 // activation-lowerbound is 0.0
-    rt: -2 // slightly higher
-    // bll, lf, ol, mas, ans as default, mp wont needed because pm is off, base-level term has a network-sense than frequentist
-    default-operator-assoc: 0.0
-    default-inter-operator-assoc: 0 // skill/operator-operator assocs now learn through context (e.g., "goal%last-operator%name") with maximum association of 1.0
-    default-operator-self-assoc: 0.0 // default self-assoc is retained to prevent repetition
-    mas: 0.0 // similarly for context-declarative assocs
-    context-learning: t // context-operator + context-declarative learning all in one
-    beta: 0.001 // learning rate
-    // reward: 1
-    negreward: t // turn on positive and negative learning, magnitude not relevant
+    context-learning: t
+    dat: 0.05
+    rt: -2
+    lf: 0.005 // parameter F
+    beta: 0.0001
+    negreward: t
     sp2bl: 1
-    ga: 2
-    input-activation-op: 5
-    input-activation-ch: 5
-    retrieval-activation-op: 0 // already taken care in "ga:"
-    retrieval-activation-ch: 5
-    wm-activation-op: 5
-    wm-activation-ch: 5
-    ans: 0.05
-    explore-exploit: 0.1
-    local-or-global: t // comment out means global
+    ga: 1
+    input-activation-op: 0
+    input-activation-ch: 1
+    retrieval-activation-op: 0
+    retrieval-activation-ch: 1
+    wm-activation-op: 0
+    wm-activation-ch: 1
+    ans: 0.001
+    // local-or-global: t // comment out means global
     single-or-multiple: t // multiple
+    perception-action-latency: 0.05
+    production-prim-latency: 0.0
 
     // We define the objective and subjective sequential positions in procedural outcome definitions. The objective position is defined as the actual position of the pattern (e.g., XYZ, there are the corresponding positions from 1-3). The collection of objective positions should not matter as to how the model subjectively perceived the pattern but was nevertheless included to provide a more clear understanding of what the model is doing.
     
@@ -298,17 +287,6 @@ define skill all {
 //  CLEAR BUFFERS WHEN PATTERN ENDED (NO REINFORCEMENT)  //
 ////////////////////////////////////////////////////////////
    
-  operator gapint {
-    G1 <> nil
-    V2 = gap
-    ==>
-    // one -> AC1
-    // one -> AC2
-    nil -> WM0
-    nil -> V2
-    one -> V1
-    nil -> G4
-  }
   
 }
 
@@ -346,6 +324,13 @@ define init-script {
 
 define script {
   trace-operators("true")
+  
+  num_of_words = 5                                        // number of words to be presented***
+  num_of_syls = 3                                           // number of sylls in each word***
+  contain_isi = 1                                           // no in Saffran, yes in Marcus Gomez
+  words = num_of_words - 1                                  // to cal. i
+  positions = num_of_words * (num_of_syls + contain_isi)    // to cal. total number of positions
+    
     
   set = [
     ["ba", "po", "po"],
@@ -354,12 +339,6 @@ define script {
     ["ko", "po", "po"]
         ]
  
-  num_of_words = 5                                         // number of words to be presented***
-  num_of_syls = 3                                           // number of sylls in each word***
-  contain_isi = 1                                           // no in Saffran, yes in Marcus Gomez
-  words = num_of_words - 1                                  // to cal. i
-  positions = num_of_words * (num_of_syls + contain_isi)    // to cal. total number of positions
-  
   list = []
   for i in 0 to words {
   k = random(length(set)+1)-1 // random() starts from 1 whereas length() starts from 0
@@ -991,7 +970,6 @@ trial-start()
             // no gap was processed by the model
             print(i, pos[syllableno], ": ", list[i],": item passed before notice (M-I-S-S) ", time()) // now instead of pos[syl]
             plot-point(0)
-
             // move to next syll. without seg/reward
             syllablechange = i
             trialchange = 0
@@ -1069,6 +1047,7 @@ trial-start()
                 rwd = latency + rwd0
                 issue-reward()
                 issue-neg-reward()
+                
                 subj_seg_start = time()
 
                 // run until end of syll.
@@ -1100,6 +1079,7 @@ trial-start()
                 rwd = latency + rwd0
                 issue-reward()
                 issue-neg-reward()
+                
                 subj_seg_start = time()
 
                 // run until end of syll.
@@ -1118,14 +1098,18 @@ trial-start()
             }
         }  // end of condition 2
     } // end of conditions
+    clear-buffer("imaginal")
+    set-buffer-slot("input", "slot2", "nil")
+    set-buffer-slot("input", "slot1", "one")
+    set-buffer-slot("goal", "slot4", "nil")
+    issue-no-reward() // the subjective "trial end" so-to-speak
+    
     } // END OF D
     } // END OF CD
     } // END OF BCD
   } // END OF ABCD
-  
   trace-assocs()
-  issue-no-reward()
-  trial-end()
+  trial-end() // end of a sequence
   // sleep(5.0)
 }
 
